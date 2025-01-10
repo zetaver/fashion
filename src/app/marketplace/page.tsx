@@ -1,31 +1,41 @@
 "use client";
+
+// Import necessary React and Next.js components
 import React, { useEffect, useState } from "react";
-import { getNFTDetail, getNFTList } from "@/utils/nftMarket";
 import Image from "next/image";
 import Link from "next/link";
 import { FaExternalLinkAlt } from "react-icons/fa";
-import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
-import Card from "@/components/Card";
-import Skeleton from "@/components/Skeleton";
+import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
+// Utility functions for NFT marketplace interactions
+import { getNFTDetail, getNFTList } from "@/utils/nftMarket";
+
+// Reusable UI components
+import Card from "@/components/Card";
+import Skeleton from "@/components/Skeleton";
+
+// TypeScript interface for NFT details
 export interface NFTDetail {
   name: string;
   symbol: string;
   image?: string;
-  group?: string;  // Ensure that 'group' represents the collection
+  group?: string;
   mint: string;
   seller: string;
   price: string;
   listing: string;
-  category?: string;  // Add category if relevant
+  collection: string;
 }
 
+// Function to shorten cryptocurrency addresses for display
 const trimAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
 
+// Main component definition
 const Closet: React.FC = () => {
-  const { publicKey } = useWallet();
+  const wallet = useAnchorWallet();
+  const { connection } = useConnection();
   const [assets, setAssets] = useState<NFTDetail[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<NFTDetail[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -36,69 +46,68 @@ const Closet: React.FC = () => {
     category: "",
   });
 
-  const wallet = useAnchorWallet();
-  const { connection } = useConnection();
-
+  // Fetch NFTs when wallet or connection changes
   useEffect(() => {
-    if (wallet) fetchNFTs();
-  }, [wallet]);
+    const fetchNFTs = async () => {
+      if (!wallet || !connection) return;
 
-  const fetchNFTs = async () => {
-    setIsLoading(true);
-    const provider = new AnchorProvider(connection, wallet as Wallet, {});
-    try {
-      const listings = await getNFTList(provider, connection);
-      const promises = listings
-        .filter((list) => list.isActive)
-        .map((list) => {
-          const mint = new PublicKey(list.mint);
-          return getNFTDetail(
-            mint,
+      setIsLoading(true);
+      const provider = new AnchorProvider(connection, wallet as Wallet, {});
+      try {
+        const listings = await getNFTList(provider, connection);
+        const promises = listings
+          .filter(list => list.isActive)
+          .map(list => getNFTDetail(
+            new PublicKey(list.mint),
             connection,
             list.seller,
             list.price,
             list.pubkey
-          );
-        });
-      const detailedListings = await Promise.all(promises);
-      setAssets(detailedListings);
-      setFilteredAssets(detailedListings);
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+          ));
 
+        const detailedListings = await Promise.all(promises);
+        setAssets(detailedListings);
+        setFilteredAssets(detailedListings);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNFTs();
+  }, [wallet, connection]);
+
+  // Apply filters to the list of NFTs
+  useEffect(() => {
+    applyFilters();
+  }, [assets, filters]);
+
+  // Handle changes to filter inputs
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      [name]: value,
-    }));
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
+  // Function to apply filters based on user input
   const applyFilters = () => {
-    let filtered = assets;
-    if (filters.collection) {
-      filtered = filtered.filter((asset) => asset.group === filters.collection);
-    }
-    if (filters.minPrice || filters.maxPrice) {
-      filtered = filtered.filter((asset) => {
-        const price = parseFloat(asset.price) / 1000000;
-        return price >= filters.minPrice && price <= filters.maxPrice;
-      });
-    }
-    if (filters.category) {
-      filtered = filtered.filter((asset) => asset.category === filters.category);
-    }
+    const filtered = assets.filter(asset => {
+      const price = parseFloat(asset.price) / 1e6; // Normalize price for comparison
+      return (
+        (filters.collection === '' || (asset.collection && asset.collection.toLowerCase().includes(filters.collection.toLowerCase()))) &&
+        (filters.category === '' || asset.category === filters.category) &&
+        price >= filters.minPrice &&
+        price <= filters.maxPrice
+      );
+    });
     setFilteredAssets(filtered);
   };
 
+  // Render the component
   return (
     <div className="p-4 pt-20 bg-white dark:bg-black min-h-screen flex">
       <div className="w-1/4 p-4 bg-gray-200 rounded-lg">
-        {/* Filter Section */}
+        {/* Filters section */}
         <h2 className="text-xl font-semibold text-center mb-4">Filters</h2>
         <div className="mb-4">
           <label className="block text-sm">Collection</label>
@@ -112,7 +121,7 @@ const Closet: React.FC = () => {
           />
         </div>
         <div className="mb-4">
-          <label className="block text-sm">Price Range(SOL)</label>
+          <label className="block text-sm">Price Range (SOL)</label>
           <div className="flex justify-between">
             <input
               type="number"
@@ -132,33 +141,11 @@ const Closet: React.FC = () => {
             />
           </div>
         </div>
-        <div className="mb-4">
-          <label className="block text-sm">Category</label>
-          <select
-            name="category"
-            value={filters.category}
-            onChange={handleFilterChange}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">Select Category</option>
-            <option value="Art">Art</option>
-            <option value="Music">Music</option>
-            <option value="Photography">Photography</option>
-          </select>
-        </div>
-        <button
-          onClick={applyFilters}
-          className="w-full p-2 bg-blue-500 text-white rounded"
-        >
-          Apply Filters
-        </button>
       </div>
 
       <div className="w-3/4 p-4">
-        <h1 className="text-3xl font-bold mb-4 text-center text-black dark:text-white">
-          NFTs on sale
-        </h1>
-
+        {/* Display NFTs or loading state */}
+        <h1 className="text-3xl font-bold mb-4 text-center text-black dark:text-white">NFTs on sale</h1>
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, index) => (
@@ -198,8 +185,7 @@ const Closet: React.FC = () => {
                     target="_blank"
                     className="hover:text-gray-300 flex items-center"
                   >
-                    {trimAddress(asset.mint)}{" "}
-                    <FaExternalLinkAlt className="ml-1" />
+                    {trimAddress(asset.mint)} <FaExternalLinkAlt className="ml-1" />
                   </Link>
                   {asset.group && (
                     <Link
@@ -207,8 +193,7 @@ const Closet: React.FC = () => {
                       target="_blank"
                       className="hover:text-gray-300 flex items-center"
                     >
-                      Group: {trimAddress(asset.group)}{" "}
-                      <FaExternalLinkAlt className="ml-1" />
+                      Group: {trimAddress(asset.group)} <FaExternalLinkAlt className="ml-1" />
                     </Link>
                   )}
                 </div>
@@ -216,9 +201,7 @@ const Closet: React.FC = () => {
             ))}
           </div>
         ) : (
-          <h2 className="text-2xl font-bold mb-4 text-center text-red-500 dark:text-yellow">
-            No NFTs on sale
-          </h2>
+          <h2 className="text-2xl font-bold mb-4 text-center text-red-500 dark:text-yellow">No NFTs on sale</h2>
         )}
       </div>
     </div>

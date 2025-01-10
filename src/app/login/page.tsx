@@ -32,18 +32,20 @@ const Login = () => {
 
   // Google Login - Trigger Google authentication flow
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:4000/api/auth/google";  // Redirect to Google login
+    router.push("http://localhost:4000/api/auth/google");  // Use Next.js router for redirection
+
+    // window.location.href = "http://localhost:4000/api/auth/google";  // Redirect to Google login
   };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     const user = params.get("user");
-  
+
     if (token && user) {
       localStorage.setItem("token", token);
       localStorage.setItem("user", user);
-  
+
       router.push("/dashboard");
     }
   }, [router]);
@@ -88,17 +90,17 @@ const Login = () => {
         </form>
 
         {/* Google login button */}
-        <button
-          onClick={handleGoogleLogin}
-          className="w-full bg-white border border-gray-300 text-black p-2 rounded-full mt-4 flex items-center justify-center shadow-sm hover:shadow-md"
-        >
+
+        <a href="http://localhost:4000/api/auth/google" className="w-full bg-white border border-gray-300 text-black p-2 rounded-full mt-4 flex items-center justify-center shadow-sm hover:shadow-md">
+
           <img
             src="assets/icons/google-image.png"
             alt="Google Logo"
             className="w-9 h-7 mr-2"
           />
           Continue with Google
-        </button>
+        </a>
+
 
         <Link href="/register" className="text-blue-500 dark:text-blue-300 hover:underline mt-4 inline-block">
           Register here

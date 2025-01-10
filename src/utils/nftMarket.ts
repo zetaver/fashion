@@ -94,7 +94,7 @@ export async function listNFT(
   console.log("NFT listed successfully", listing.publicKey.toString());
 }
 
-export async function withdrawNFT() {}
+export async function withdrawNFT() { }
 
 export async function buyNFT(
   mint: PublicKey,
@@ -387,6 +387,9 @@ export async function getNFTDetail(
     TOKEN_2022_PROGRAM_ID
   );
   let image_url = "";
+  let collection = metadata?.additionalMetadata?.find(data => data.key === "collection")?.value || "";  // Default to existing metadata
+
+
   console.log(metadata);
   if (metadata?.uri.includes("jpeg" || "png" || "jpg"))
     image_url = metadata?.uri || "";
@@ -395,6 +398,10 @@ export async function getNFTDetail(
     if (response.ok) {
       const res_data = await response.json();
       image_url = res_data.image;
+      // Check if res_data contains a collection property and use it to override
+      if (res_data.collection) {
+        collection = res_data.collection;
+      }
       console.log(res_data);
     }
   }
@@ -407,6 +414,7 @@ export async function getNFTDetail(
     seller: seller,
     price: price,
     listing: listing,
+    collection: collection,
   };
   return NFTItem;
 }
