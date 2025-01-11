@@ -1,44 +1,50 @@
-// Import necessary Node.js modules
+// Import necessary modules
 const express = require("express");
 const passport = require("passport");
-require("../config/passportConfig");  // Import passport configuration
-const jwt = require("jsonwebtoken");  // Module to issue JWTs for authenticated users
+require("../config/passportConfig");  // Initialize Passport configuration
+const jwt = require("jsonwebtoken");  // For issuing JSON Web Tokens (JWT)
+
+// Import controller functions for handling authentication logic
 const {
   registerUser,
   loginUser,
   getUserInfo,
   updateUserInfo
-} = require("../controllers/authController");  // Controller functions handling user actions
-const User = require("../models/User");  // User model for MongoDB
+} = require("../controllers/authController");
 
-const router = express.Router();  // Create a new router object to handle routes
+// Import the User model for MongoDB operations
+const User = require("../models/User");
 
-// Route to start Google OAuth authentication process
+// Create a new router instance to define route handlers
+const router = express.Router();
+
+// Initiate Google OAuth authentication process
 router.get(
   "/api/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] }) // Scope specifies what data we want from Google's servers
+  passport.authenticate("google", { scope: ["profile", "email"] }) // Request profile and email information
 );
 
-// Route for Google OAuth callback
-router.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }), // Use passport to authenticate; redirect to login on fail
+// Handle Google OAuth callback and issue a JWT upon successful authentication
+router.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    // Generate a JWT for the user with their ID and role, expiring in 1 hour
+    // Generate a JWT with the user's ID and role, valid for 1 hour
     const token = jwt.sign(
       { id: req.user._id, role: req.user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    // Redirect user to the client-side route with the token and user info as query parameters
+    // Redirect the user to the frontend app with the token and user data
     res.redirect(`http://localhost:3000/login?token=${token}&user=${JSON.stringify(req.user)}`);
   }
 );
 
-// Route to register a new user
+// Define route for user registration
 router.post("/api/register", registerUser);
 
-// Route to login a user
+// Define route for user login
 router.post("/api/login", loginUser);
 
-// Export the router to be mounted by the main application
+// Export the router for use in the main application
 module.exports = router;
